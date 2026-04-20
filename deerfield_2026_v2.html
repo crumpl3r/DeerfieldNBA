@@ -1,0 +1,706 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Deerfield 2026 NBA Playoff Points</title>
+<style>
+:root{
+  --navy:#0f1f3d;--navy-mid:#1a2f52;
+  --gold:#c9a84c;--gold-light:#e8c96a;--gold-dim:#8a6f2e;
+  --off:#f4f3f0;--muted:#9aa3b0;--text:#1a1a2e;
+  --surf:#fff;--border:#e2e0f0;
+  --alive-bg:#e8f5e9;--alive-txt:#2e7d32;
+  --dead-bg:#fce4ec;--dead-txt:#c62828;
+  --pos:#2e7d32;--neg:#c62828;--rank1:#b8860b;
+  --warn:#fff8e1;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Georgia',serif;background:var(--off);color:var(--text);min-height:100vh;}
+
+/* HEADER */
+.hdr{background:var(--navy);border-bottom:2px solid var(--gold);padding:18px 28px 14px;}
+.hdr-row{display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:10px;}
+.hdr-lbl{font-family:'Courier New',monospace;font-size:10px;letter-spacing:.2em;color:var(--gold);text-transform:uppercase;margin-bottom:4px;}
+h1{font-size:22px;font-weight:normal;color:#fff;}h1 span{color:var(--gold);}
+.hdr-meta{font-family:'Courier New',monospace;font-size:11px;color:var(--muted);margin-top:3px;}
+.ref-btn{display:flex;align-items:center;gap:7px;background:rgba(201,168,76,.15);border:1px solid var(--gold-dim);border-radius:6px;padding:7px 13px;color:var(--gold-light);font-family:'Courier New',monospace;font-size:12px;cursor:pointer;}
+.ref-btn:hover{background:rgba(201,168,76,.25);}
+.ref-btn:disabled{opacity:.5;cursor:not-allowed;}
+.spin{display:none;width:12px;height:12px;border:2px solid rgba(201,168,76,.3);border-top-color:var(--gold);border-radius:50%;animation:spin .7s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg)}}
+.spin.on{display:block;}
+
+/* API BAR */
+.api-bar{background:var(--navy-mid);border-bottom:1px solid rgba(201,168,76,.2);padding:7px 28px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+.api-bar label{font-family:'Courier New',monospace;font-size:11px;color:var(--muted);white-space:nowrap;}
+.api-bar input{flex:1;min-width:220px;max-width:380px;font-family:'Courier New',monospace;font-size:12px;padding:5px 9px;background:rgba(255,255,255,.07);border:1px solid rgba(201,168,76,.25);border-radius:4px;color:var(--gold-light);}
+.api-bar input::placeholder{color:rgba(201,168,76,.35);}
+.api-note{font-family:'Courier New',monospace;font-size:10px;color:rgba(154,163,176,.65);}
+
+/* TABS */
+.tab-bar{display:flex;gap:3px;padding:12px 28px 0;background:var(--navy-mid);}
+.tab{font-family:'Courier New',monospace;font-size:11px;padding:6px 14px;border-radius:6px 6px 0 0;border:1px solid rgba(201,168,76,.2);border-bottom:none;background:rgba(255,255,255,.04);color:var(--muted);cursor:pointer;}
+.tab:hover{color:var(--gold-light);}
+.tab.active{background:var(--off);color:var(--text);border-color:var(--border);}
+
+/* STATUS */
+.status-bar{padding:7px 28px;font-family:'Courier New',monospace;font-size:11px;display:flex;align-items:center;gap:7px;background:var(--off);border-bottom:1px solid var(--border);}
+.sdot{width:7px;height:7px;border-radius:50%;background:#999;flex-shrink:0;}
+.sdot.ok{background:var(--pos);}
+.sdot.loading{background:var(--gold);animation:pulse 1s infinite;}
+.sdot.err{background:var(--neg);}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+
+/* MAIN */
+.main{padding:16px 28px 32px;}
+
+/* STAT CARDS */
+.stat-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px;margin-bottom:14px;}
+.sc{background:var(--surf);border:1px solid var(--border);border-radius:8px;padding:10px 12px;text-align:center;}
+.sc-lbl{font-family:'Courier New',monospace;font-size:9px;letter-spacing:.12em;color:var(--muted);text-transform:uppercase;margin-bottom:4px;}
+.sc-val{font-size:20px;font-weight:bold;color:var(--navy);line-height:1;}
+.sc-sub{font-size:10px;color:var(--muted);margin-top:2px;font-family:'Courier New',monospace;}
+
+/* CONTROLS */
+.ctrl{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;align-items:center;}
+.ctrl input,.ctrl select{font-family:'Courier New',monospace;font-size:12px;padding:6px 9px;border:1px solid var(--border);border-radius:6px;background:var(--surf);color:var(--text);height:32px;}
+.ctrl input{flex:1;min-width:140px;}
+
+/* TABLES */
+.tw{background:var(--surf);border-radius:10px;border:1px solid var(--border);overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.05);margin-bottom:14px;overflow-x:auto;}
+table{width:100%;border-collapse:collapse;font-size:12px;min-width:580px;}
+thead{background:var(--navy);}
+th{padding:9px 10px;text-align:left;font-family:'Courier New',monospace;font-size:10px;letter-spacing:.08em;color:var(--muted);text-transform:uppercase;cursor:pointer;white-space:nowrap;user-select:none;border-right:1px solid rgba(255,255,255,.05);}
+th:last-child{border-right:none;}
+th:hover{color:var(--gold-light);}
+th.as{color:var(--gold);}
+td{padding:8px 10px;border-bottom:1px solid var(--border);color:var(--text);vertical-align:middle;white-space:nowrap;}
+tr:last-child td{border-bottom:none;}
+tr:hover td{background:#f7f6ff;}
+tr.warn-row td{background:var(--warn);}
+tr.warn-row:hover td{background:#fff3cd;}
+
+.pname{font-weight:bold;font-size:12px;}
+.tbadge{display:inline-block;font-family:'Courier New',monospace;font-size:10px;font-weight:bold;padding:2px 6px;border-radius:3px;background:var(--navy);color:var(--gold-light);}
+.obadge{display:inline-block;font-family:'Courier New',monospace;font-size:10px;font-weight:bold;padding:2px 6px;border-radius:3px;}
+.abadge{display:inline-block;font-family:'Courier New',monospace;font-size:10px;font-weight:bold;padding:2px 7px;border-radius:10px;}
+.a1{background:var(--alive-bg);color:var(--alive-txt);}
+.a0{background:var(--dead-bg);color:var(--dead-txt);}
+.r1{color:var(--rank1);font-weight:bold;font-size:14px;}
+.rtop{color:#1565c0;font-weight:bold;}
+.pts-strong{font-weight:bold;font-size:13px;}
+.dpos{color:var(--pos);font-weight:bold;font-family:'Courier New',monospace;}
+.dneg{color:var(--neg);font-weight:bold;font-family:'Courier New',monospace;}
+.d0{color:#999;font-family:'Courier New',monospace;}
+.mono{font-family:'Courier New',monospace;color:#555;}
+.bw{display:flex;align-items:center;gap:6px;}
+.bar{flex:1;height:4px;background:#e8e6f0;border-radius:2px;overflow:hidden;min-width:28px;max-width:56px;}
+.bf{height:100%;border-radius:2px;}
+
+/* LEADERBOARD CARDS */
+.lb-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;margin-bottom:14px;}
+.lb-card{background:var(--surf);border:1px solid var(--border);border-radius:10px;padding:14px 15px;cursor:pointer;transition:border-color .15s,box-shadow .15s;}
+.lb-card:hover{border-color:rgba(201,168,76,.5);box-shadow:0 2px 12px rgba(201,168,76,.1);}
+.lb-card.selected{border:2px solid var(--gold);background:#fffcf0;}
+.lb-rank-lbl{font-family:'Courier New',monospace;font-size:10px;color:var(--muted);margin-bottom:3px;}
+.lb-name{font-size:15px;font-weight:bold;margin-bottom:5px;}
+.lb-pts-big{font-size:24px;font-weight:bold;}
+.lb-sub{font-family:'Courier New',monospace;font-size:10px;color:var(--muted);margin-top:2px;}
+.lb-prog{height:4px;background:#e8e6f0;border-radius:2px;margin-top:10px;overflow:hidden;}
+.lb-prog-fill{height:100%;border-radius:2px;}
+
+/* OWNER VIEW */
+.owner-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;}
+.owner-title-bar{font-size:16px;font-weight:bold;font-family:'Georgia',serif;}
+.close-btn{font-family:'Courier New',monospace;font-size:11px;padding:3px 10px;border:1px solid var(--border);border-radius:5px;background:var(--surf);cursor:pointer;color:#888;}
+.close-btn:hover{background:#f0f0f0;}
+
+/* OVERLAY */
+.overlay{display:none;position:fixed;inset:0;background:rgba(15,31,61,.75);z-index:100;align-items:center;justify-content:center;flex-direction:column;gap:14px;}
+.overlay.on{display:flex;}
+.big-spin{width:36px;height:36px;border:3px solid rgba(201,168,76,.2);border-top-color:var(--gold);border-radius:50%;animation:spin .7s linear infinite;}
+.overlay-txt{font-family:'Courier New',monospace;font-size:13px;color:var(--gold-light);}
+
+/* FOOTER */
+.footer{background:var(--navy-mid);border-top:1px solid rgba(201,168,76,.2);padding:12px 28px;display:flex;justify-content:space-between;flex-wrap:wrap;gap:6px;}
+.fn{font-family:'Courier New',monospace;font-size:11px;color:var(--muted);}
+.fn span{color:var(--gold-dim);}
+.fn a{color:var(--gold-dim);text-decoration:none;}
+.fn a:hover{color:var(--gold-light);}
+
+@media(max-width:640px){
+  .hdr,.api-bar,.tab-bar,.status-bar,.main,.footer{padding-left:12px;padding-right:12px;}
+  h1{font-size:18px;}.hide-sm{display:none;}
+}
+</style>
+</head>
+<body>
+
+<div class="overlay" id="overlay">
+  <div class="big-spin"></div>
+  <div class="overlay-txt" id="overlay-txt">Fetching live playoff stats…</div>
+</div>
+
+<div class="hdr">
+  <div class="hdr-row">
+    <div>
+      <div class="hdr-lbl">2026 NBA Playoffs</div>
+      <h1>Deerfield <span>Playoff Points</span></h1>
+      <div class="hdr-meta">11 teams · 110 players · Game 1 stats · Updated Apr 20, 2026</div>
+    </div>
+    <button class="ref-btn" id="refBtn" onclick="fetchLive()">
+      <div class="spin" id="spin"></div>
+      <span id="refLbl">↺ Refresh live stats</span>
+    </button>
+  </div>
+</div>
+
+<div class="api-bar">
+  <label>API Key:</label>
+  <input type="password" id="apiKey" placeholder="sk-ant-api… (Anthropic key to refresh stats)" onchange="saveKey()"/>
+  <span class="api-note">Key stored in your browser only · sends to api.anthropic.com only</span>
+</div>
+
+<div class="tab-bar">
+  <button class="tab active" onclick="showTab('lb')">Standings</button>
+  <button class="tab" onclick="showTab('board')">Player Board</button>
+  <button class="tab" onclick="showTab('view')">Owner View</button>
+</div>
+
+<div class="status-bar">
+  <div class="sdot ok" id="sdot"></div>
+  <span id="stxt">Game 1 stats loaded (Apr 18–19, 2026). Anyone can enter an API key and hit Refresh to update.</span>
+</div>
+
+<!-- ── STANDINGS TAB ── -->
+<div id="tab-lb" class="main">
+  <div class="stat-row" id="lb-stats"></div>
+  <div class="lb-grid" id="lb-grid"></div>
+  <div id="lb-roster-section" style="display:none">
+    <div class="owner-hdr">
+      <div class="owner-title-bar" id="lb-owner-title"></div>
+      <button class="close-btn" onclick="closeLBRoster()">✕ Close</button>
+    </div>
+    <div class="tw"><table>
+      <thead><tr>
+        <th onclick="sortO('rank')" id="oth-rank">Rk</th>
+        <th onclick="sortO('player')" id="oth-player">Player</th>
+        <th onclick="sortO('pick')" id="oth-pick">Pk</th>
+        <th onclick="sortO('nbaTeam')" id="oth-nbaTeam">Team</th>
+        <th onclick="sortO('games')" id="oth-games">G</th>
+        <th onclick="sortO('totalPts')" id="oth-totalPts">Total Pts</th>
+        <th onclick="sortO('ppg')" id="oth-ppg">PPG</th>
+        <th onclick="sortO('alive')" id="oth-alive">Alive</th>
+        <th onclick="sortO('delta')" id="oth-delta">D–R</th>
+      </tr></thead>
+      <tbody id="oth-tbody"></tbody>
+    </table></div>
+  </div>
+</div>
+
+<!-- ── PLAYER BOARD TAB ── -->
+<div id="tab-board" class="main" style="display:none">
+  <div class="ctrl">
+    <input type="text" id="search" placeholder="Search player, team, or owner…" oninput="renderBoard()"/>
+    <select id="fOwner" onchange="renderBoard()"><option value="">All owners</option></select>
+    <select id="fTeam" onchange="renderBoard()"><option value="">All NBA teams</option></select>
+    <select id="fAlive" onchange="renderBoard()">
+      <option value="">All players</option>
+      <option value="1">Alive only</option>
+      <option value="0">Eliminated only</option>
+    </select>
+    <select id="sortSel" onchange="setBoardSort()">
+      <option value="totalPts-d">Total pts ↓</option>
+      <option value="rank-a">Rank ↑</option>
+      <option value="pick-a">Pick # ↑</option>
+      <option value="ppg-d">PPG ↓</option>
+      <option value="delta-d">Value delta ↓</option>
+      <option value="owner-a">Owner A–Z</option>
+    </select>
+  </div>
+  <div class="tw"><table>
+    <thead><tr>
+      <th onclick="sortB('rank')" id="bth-rank">Rk</th>
+      <th onclick="sortB('player')" id="bth-player">Player</th>
+      <th onclick="sortB('pick')" id="bth-pick">Pk</th>
+      <th onclick="sortB('owner')" id="bth-owner">Owner</th>
+      <th onclick="sortB('nbaTeam')" id="bth-nbaTeam">Team</th>
+      <th onclick="sortB('games')" id="bth-games">G</th>
+      <th onclick="sortB('totalPts')" id="bth-totalPts">Total Pts</th>
+      <th onclick="sortB('ppg')" id="bth-ppg">PPG</th>
+      <th onclick="sortB('alive')" id="bth-alive">Alive</th>
+      <th onclick="sortB('delta')" id="bth-delta">D–R</th>
+    </tr></thead>
+    <tbody id="bth-tbody"></tbody>
+  </table></div>
+  <p style="font-family:'Courier New',monospace;font-size:10px;color:#888;margin-top:-6px">D–R = Draft pick number minus current rank. Positive = outperforming draft position.</p>
+</div>
+
+<!-- ── OWNER VIEW TAB ── -->
+<div id="tab-view" class="main" style="display:none">
+  <div class="ctrl">
+    <select id="ownerSel" onchange="renderOwnerView()" style="flex:none;width:auto;font-size:14px;padding:7px 12px;height:38px;font-weight:bold;">
+      <option value="">— Select an owner —</option>
+    </select>
+  </div>
+  <div id="owner-view-content" style="display:none">
+    <div class="stat-row" id="ov-stats"></div>
+    <div class="tw"><table>
+      <thead><tr>
+        <th onclick="sortV('rank')" id="vth-rank">Rk</th>
+        <th onclick="sortV('player')" id="vth-player">Player</th>
+        <th onclick="sortV('pick')" id="vth-pick">Pk</th>
+        <th onclick="sortV('nbaTeam')" id="vth-nbaTeam">Team</th>
+        <th onclick="sortV('games')" id="vth-games">G</th>
+        <th onclick="sortV('totalPts')" id="vth-totalPts">Total Pts</th>
+        <th onclick="sortV('ppg')" id="vth-ppg">PPG</th>
+        <th onclick="sortV('alive')" id="vth-alive">Alive</th>
+        <th onclick="sortV('delta')" id="vth-delta">D–R</th>
+      </tr></thead>
+      <tbody id="vth-tbody"></tbody>
+    </table></div>
+  </div>
+  <div id="owner-view-empty" style="text-align:center;padding:48px;font-family:'Courier New',monospace;font-size:13px;color:var(--muted);">
+    Select an owner from the dropdown to view their roster.
+  </div>
+</div>
+
+<div class="footer">
+  <div class="fn">Deerfield 2026 · 11 teams · 110 players · <span>Game 1 data seeded</span></div>
+  <div class="fn">D–R = Draft pick minus rank · Refresh = pulls live stats via Anthropic API</div>
+</div>
+
+<script>
+// ── OWNER COLOR MAP ───────────────────────────────────────────────────────────
+const OC = {
+  Ackerlund:'#5B4A9C', Blake:'#0a7c42', Boynton:'#c06b0a',
+  Crumpler:'#185FA5',  McClanahan:'#7b1fa2', Malouf:'#00796b',
+  Parker:'#455a64',    Rathie:'#880e4f',     Sims:'#e53935',
+  Stewart:'#1565c0',   Vanderwel:'#a04010',
+};
+
+// ── FULL 110-PLAYER ROSTER ────────────────────────────────────────────────────
+// Owners mapped by confirmed pick numbers from the Google Sheet:
+// Ackerlund=P10(1,13,24,35,46,57,68,79,90,101)  Blake=P4(4,19,30,41,52,63,74,85,96,107)
+// Boynton=P6(6,17,28,39,50,61,72,83,94,105)     Crumpler=P2(2,21,32,43,54,65,76,87,98,109)
+// McClanahan=P3(3,20,31,42,53,64,75,86,97,108)  Malouf=P8(8,15,26,37,48,59,70,81,92,103)
+// Parker=P9(9,14,25,36,47,58,69,80,91,102)      Rathie=P11(11,12,23,34,45,56,67,78,89,100)
+// Sims=P5(5,18,29,40,51,62,73,84,95,106)        Stewart=P1(1,22,33,44,55,66,77,88,99,110)
+// Vanderwel=P7(7,16,27,38,49,60,71,82,93,104)
+const PLAYERS = [
+// ACKERLUND
+{player:"Jalen Williams",           pick:10,  owner:"Ackerlund", nbaTeam:"OKC", games:1,totalPts:22, ppg:22.0,alive:1},
+{player:"Anthony Edwards",          pick:13,  owner:"Ackerlund", nbaTeam:"MIN", games:1,totalPts:22, ppg:22.0,alive:1},
+{player:"Evan Mobley",              pick:24,  owner:"Ackerlund", nbaTeam:"CLE", games:1,totalPts:17, ppg:17.0,alive:1},
+{player:"Rudy Gobert",              pick:35,  owner:"Ackerlund", nbaTeam:"MIN", games:1,totalPts:17, ppg:17.0,alive:1},
+{player:"Alex Caruso",              pick:46,  owner:"Ackerlund", nbaTeam:"OKC", games:1,totalPts:2,  ppg:2.0, alive:1},
+{player:"Luka Doncic",              pick:57,  owner:"Ackerlund", nbaTeam:"LAL", games:0,totalPts:0,  ppg:0.0, alive:0,warn:true},
+{player:"Tyrese Maxey",             pick:68,  owner:"Ackerlund", nbaTeam:"PHI", games:1,totalPts:21, ppg:21.0,alive:1},
+{player:"Jalen Suggs",              pick:79,  owner:"Ackerlund", nbaTeam:"ORL", games:1,totalPts:16, ppg:16.0,alive:1},
+{player:"Paul George",              pick:90,  owner:"Ackerlund", nbaTeam:"PHI", games:1,totalPts:17, ppg:17.0,alive:1},
+{player:"Jordan Walsh",             pick:101, owner:"Ackerlund", nbaTeam:"BOS", games:1,totalPts:5,  ppg:5.0, alive:1},
+// BLAKE
+{player:"Jayson Tatum",             pick:4,   owner:"Blake",     nbaTeam:"BOS", games:1,totalPts:25, ppg:25.0,alive:1},
+{player:"Julius Randle",            pick:19,  owner:"Blake",     nbaTeam:"MIN", games:1,totalPts:16, ppg:16.0,alive:1},
+{player:"Jaden McDaniels",          pick:30,  owner:"Blake",     nbaTeam:"MIN", games:1,totalPts:16, ppg:16.0,alive:1},
+{player:"Amen Thompson",            pick:41,  owner:"Blake",     nbaTeam:"HOU", games:1,totalPts:17, ppg:17.0,alive:1},
+{player:"Jabari Smith Jr.",         pick:52,  owner:"Blake",     nbaTeam:"HOU", games:1,totalPts:16, ppg:16.0,alive:1},
+{player:"Sam Merrill",              pick:63,  owner:"Blake",     nbaTeam:"OKC", games:1,totalPts:7,  ppg:7.0, alive:1},
+{player:"Jaylin Williams",          pick:74,  owner:"Blake",     nbaTeam:"OKC", games:1,totalPts:5,  ppg:5.0, alive:1},
+{player:"Kevin Huerter",            pick:85,  owner:"Blake",     nbaTeam:"OKC", games:1,totalPts:3,  ppg:3.0, alive:1},
+{player:"Kenrich Williams",         pick:96,  owner:"Blake",     nbaTeam:"OKC", games:1,totalPts:2,  ppg:2.0, alive:1},
+{player:"Jrue Holiday",             pick:107, owner:"Blake",     nbaTeam:"POR", games:1,totalPts:9,  ppg:9.0, alive:1},
+// BOYNTON
+{player:"Nikola Jokic",             pick:6,   owner:"Boynton",   nbaTeam:"DEN", games:1,totalPts:25, ppg:25.0,alive:1},
+{player:"Ajay Mitchell",            pick:17,  owner:"Boynton",   nbaTeam:"OKC", games:1,totalPts:9,  ppg:9.0, alive:1},
+{player:"Tim Hardaway Jr.",         pick:28,  owner:"Boynton",   nbaTeam:"DET", games:1,totalPts:7,  ppg:7.0, alive:1},
+{player:"Duncan Robinson",          pick:39,  owner:"Boynton",   nbaTeam:"DET", games:1,totalPts:9,  ppg:9.0, alive:1},
+{player:"Cason Wallace",            pick:50,  owner:"Boynton",   nbaTeam:"OKC", games:1,totalPts:6,  ppg:6.0, alive:1},
+{player:"Austin Reaves",            pick:61,  owner:"Boynton",   nbaTeam:"LAL", games:0,totalPts:0,  ppg:0.0, alive:0,warn:true},
+{player:"Miles McBride",            pick:72,  owner:"Boynton",   nbaTeam:"NYK", games:1,totalPts:6,  ppg:6.0, alive:1},
+{player:"Scottie Barnes",           pick:83,  owner:"Boynton",   nbaTeam:"TOR", games:1,totalPts:21, ppg:21.0,alive:1},
+{player:"Immanuel Quickley",        pick:94,  owner:"Boynton",   nbaTeam:"TOR", games:0,totalPts:0,  ppg:0.0, alive:1,warn:true},
+{player:"Jalen Green",              pick:105, owner:"Boynton",   nbaTeam:"PHX", games:1,totalPts:17, ppg:17.0,alive:1},
+// CRUMPLER
+{player:"Jaylen Brown",             pick:2,   owner:"Crumpler",  nbaTeam:"BOS", games:1,totalPts:26, ppg:26.0,alive:1},
+{player:"De'Aaron Fox",             pick:21,  owner:"Crumpler",  nbaTeam:"SAN", games:1,totalPts:17, ppg:17.0,alive:1},
+{player:"Dylan Harper",             pick:32,  owner:"Crumpler",  nbaTeam:"SAN", games:1,totalPts:6,  ppg:6.0, alive:1},
+{player:"Mikal Bridges",            pick:43,  owner:"Crumpler",  nbaTeam:"NYK", games:1,totalPts:11, ppg:11.0,alive:1},
+{player:"Josh Hart",                pick:54,  owner:"Crumpler",  nbaTeam:"NYK", games:1,totalPts:11, ppg:11.0,alive:1},
+{player:"Ausar Thompson",           pick:65,  owner:"Crumpler",  nbaTeam:"DET", games:1,totalPts:8,  ppg:8.0, alive:1},
+{player:"Peyton Watson",            pick:76,  owner:"Crumpler",  nbaTeam:"DEN", games:0,totalPts:0,  ppg:0.0, alive:1,warn:true},
+{player:"Caris LeVert",             pick:87,  owner:"Crumpler",  nbaTeam:"DET", games:1,totalPts:3,  ppg:3.0, alive:1},
+{player:"Josh Okogie",              pick:98,  owner:"Crumpler",  nbaTeam:"HOU", games:1,totalPts:7,  ppg:7.0, alive:1},
+{player:"Dennis Schroder",          pick:109, owner:"Crumpler",  nbaTeam:"CLE", games:1,totalPts:2,  ppg:2.0, alive:1},
+// MCCLANAHAN
+{player:"Cade Cunningham",          pick:3,   owner:"McClanahan",nbaTeam:"DET", games:1,totalPts:39, ppg:39.0,alive:1},
+{player:"Tobias Harris",            pick:20,  owner:"McClanahan",nbaTeam:"LAL", games:1,totalPts:17, ppg:17.0,alive:1},
+{player:"LeBron James",             pick:31,  owner:"McClanahan",nbaTeam:"LAL", games:1,totalPts:19, ppg:19.0,alive:1},
+{player:"Deandre Ayton",            pick:42,  owner:"McClanahan",nbaTeam:"LAL", games:1,totalPts:19, ppg:19.0,alive:1},
+{player:"Christian Braun",          pick:53,  owner:"McClanahan",nbaTeam:"DEN", games:1,totalPts:12, ppg:12.0,alive:1},
+{player:"Brandon Ingram",           pick:64,  owner:"McClanahan",nbaTeam:"TOR", games:1,totalPts:17, ppg:17.0,alive:1},
+{player:"RJ Barrett",               pick:75,  owner:"McClanahan",nbaTeam:"TOR", games:1,totalPts:24, ppg:24.0,alive:1},
+{player:"Shaedon Sharpe",           pick:86,  owner:"McClanahan",nbaTeam:"POR", games:1,totalPts:10, ppg:10.0,alive:1},
+{player:"Bruce Brown",              pick:97,  owner:"McClanahan",nbaTeam:"DET", games:1,totalPts:8,  ppg:8.0, alive:1},
+{player:"VJ Edgecombe",             pick:108, owner:"McClanahan",nbaTeam:"PHI", games:1,totalPts:13, ppg:13.0,alive:1},
+// MALOUF
+{player:"Jamal Murray",             pick:8,   owner:"Malouf",    nbaTeam:"DEN", games:1,totalPts:30, ppg:30.0,alive:1},
+{player:"Aaron Gordon",             pick:15,  owner:"Malouf",    nbaTeam:"DEN", games:1,totalPts:17, ppg:17.0,alive:1},
+{player:"Neemias Queta",            pick:26,  owner:"Malouf",    nbaTeam:"BOS", games:1,totalPts:13, ppg:13.0,alive:1},
+{player:"Max Strus",                pick:37,  owner:"Malouf",    nbaTeam:"CLE", games:1,totalPts:24, ppg:24.0,alive:1},
+{player:"Paolo Banchero",           pick:48,  owner:"Malouf",    nbaTeam:"ORL", games:1,totalPts:23, ppg:23.0,alive:1},
+{player:"Franz Wagner",             pick:59,  owner:"Malouf",    nbaTeam:"ORL", games:1,totalPts:19, ppg:19.0,alive:1},
+{player:"Rui Hachimura",            pick:70,  owner:"Malouf",    nbaTeam:"LAL", games:1,totalPts:14, ppg:14.0,alive:1},
+{player:"Marcus Smart",             pick:81,  owner:"Malouf",    nbaTeam:"MEM", games:0,totalPts:0,  ppg:0.0, alive:0},
+{player:"Baylor Scheierman",        pick:92,  owner:"Malouf",    nbaTeam:"BOS", games:1,totalPts:5,  ppg:5.0, alive:1},
+{player:"Jordan Clarkson",          pick:103, owner:"Malouf",    nbaTeam:"NYK", games:1,totalPts:8,  ppg:8.0, alive:1},
+// PARKER
+{player:"Chet Holmgren",            pick:9,   owner:"Parker",    nbaTeam:"OKC", games:1,totalPts:16, ppg:16.0,alive:1},
+{player:"Jalen Duren",              pick:14,  owner:"Parker",    nbaTeam:"DET", games:1,totalPts:8,  ppg:8.0, alive:1},
+{player:"Karl-Anthony Towns",       pick:25,  owner:"Parker",    nbaTeam:"NYK", games:1,totalPts:25, ppg:25.0,alive:1},
+{player:"Sam Hauser",               pick:36,  owner:"Parker",    nbaTeam:"BOS", games:1,totalPts:12, ppg:12.0,alive:1},
+{player:"Luka Garza",               pick:47,  owner:"Parker",    nbaTeam:"MEM", games:0,totalPts:0,  ppg:0.0, alive:0},
+{player:"Cameron Johnson",          pick:58,  owner:"Parker",    nbaTeam:"NYK", games:1,totalPts:12, ppg:12.0,alive:1},
+{player:"Daniss Jenkins",           pick:69,  owner:"Parker",    nbaTeam:"DET", games:1,totalPts:6,  ppg:6.0, alive:1},
+{player:"Jonas Valanciunas",        pick:80,  owner:"Parker",    nbaTeam:"ORL", games:1,totalPts:0,  ppg:0.0, alive:1},
+{player:"Luke Kornet",              pick:91,  owner:"Parker",    nbaTeam:"SAN", games:1,totalPts:10, ppg:10.0,alive:1},
+{player:"Naz Reid",                 pick:102, owner:"Parker",    nbaTeam:"MIN", games:1,totalPts:5,  ppg:5.0, alive:1},
+// RATHIE
+{player:"Payton Pritchard",         pick:11,  owner:"Rathie",    nbaTeam:"BOS", games:1,totalPts:12, ppg:12.0,alive:1},
+{player:"Derrick White",            pick:12,  owner:"Rathie",    nbaTeam:"BOS", games:1,totalPts:10, ppg:10.0,alive:1},
+{player:"Kevin Durant",             pick:23,  owner:"Rathie",    nbaTeam:"HOU", games:0,totalPts:0,  ppg:0.0, alive:1,warn:true},
+{player:"Jared McCain",             pick:34,  owner:"Rathie",    nbaTeam:"PHI", games:1,totalPts:5,  ppg:5.0, alive:1},
+{player:"Keldon Johnson",           pick:45,  owner:"Rathie",    nbaTeam:"SAN", games:1,totalPts:3,  ppg:3.0, alive:1},
+{player:"Aaron Wiggins",            pick:56,  owner:"Rathie",    nbaTeam:"OKC", games:1,totalPts:2,  ppg:2.0, alive:1},
+{player:"Isaiah Stewart",           pick:67,  owner:"Rathie",    nbaTeam:"DET", games:1,totalPts:3,  ppg:3.0, alive:1},
+{player:"Reed Sheppard",            pick:78,  owner:"Rathie",    nbaTeam:"HOU", games:1,totalPts:17, ppg:17.0,alive:1},
+{player:"Ron Holland",              pick:89,  owner:"Rathie",    nbaTeam:"DET", games:1,totalPts:2,  ppg:2.0, alive:1},
+{player:"Landry Shamet",            pick:100, owner:"Rathie",    nbaTeam:"NYK", games:1,totalPts:3,  ppg:3.0, alive:1},
+// SIMS
+{player:"Donovan Mitchell",         pick:5,   owner:"Sims",      nbaTeam:"CLE", games:1,totalPts:32, ppg:32.0,alive:1},
+{player:"James Harden",             pick:18,  owner:"Sims",      nbaTeam:"CLE", games:1,totalPts:22, ppg:22.0,alive:1},
+{player:"OG Anunoby",               pick:29,  owner:"Sims",      nbaTeam:"NYK", games:1,totalPts:18, ppg:18.0,alive:1},
+{player:"Devin Vassell",            pick:40,  owner:"Sims",      nbaTeam:"SAN", games:1,totalPts:15, ppg:15.0,alive:1},
+{player:"Julian Champagnie",        pick:51,  owner:"Sims",      nbaTeam:"SAN", games:1,totalPts:6,  ppg:6.0, alive:1},
+{player:"Luke Kennard",             pick:62,  owner:"Sims",      nbaTeam:"LAL", games:1,totalPts:27, ppg:27.0,alive:1},
+{player:"Devin Booker",             pick:73,  owner:"Sims",      nbaTeam:"PHX", games:1,totalPts:23, ppg:23.0,alive:1},
+{player:"CJ McCollum",              pick:84,  owner:"Sims",      nbaTeam:"ATL", games:1,totalPts:26, ppg:26.0,alive:1},
+{player:"Tari Eason",               pick:95,  owner:"Sims",      nbaTeam:"HOU", games:1,totalPts:16, ppg:16.0,alive:1},
+{player:"Ayo Dosunmu",              pick:106, owner:"Sims",      nbaTeam:"MIN", games:1,totalPts:14, ppg:14.0,alive:1},
+// STEWART
+{player:"Shai Gilgeous-Alexander",  pick:1,   owner:"Stewart",   nbaTeam:"OKC", games:1,totalPts:25, ppg:25.0,alive:1},
+{player:"Isaiah Joe",               pick:22,  owner:"Stewart",   nbaTeam:"OKC", games:1,totalPts:9,  ppg:9.0, alive:1},
+{player:"Jarrett Allen",            pick:33,  owner:"Stewart",   nbaTeam:"CLE", games:1,totalPts:10, ppg:10.0,alive:1},
+{player:"Nikola Vucevic",           pick:44,  owner:"Stewart",   nbaTeam:"ORL", games:1,totalPts:3,  ppg:3.0, alive:1},
+{player:"Jaylon Tyson",             pick:55,  owner:"Stewart",   nbaTeam:"CLE", games:1,totalPts:2,  ppg:2.0, alive:1},
+{player:"Harrison Barnes",          pick:66,  owner:"Stewart",   nbaTeam:"SAN", games:1,totalPts:2,  ppg:2.0, alive:1},
+{player:"Desmond Bane",             pick:77,  owner:"Stewart",   nbaTeam:"ORL", games:1,totalPts:17, ppg:17.0,alive:1},
+{player:"Nickeil Alexander-Walker", pick:88,  owner:"Stewart",   nbaTeam:"ATL", games:1,totalPts:17, ppg:17.0,alive:1},
+{player:"Dillon Brooks",            pick:99,  owner:"Stewart",   nbaTeam:"PHX", games:1,totalPts:18, ppg:18.0,alive:1},
+{player:"Anthony Black",            pick:110, owner:"Stewart",   nbaTeam:"ORL", games:1,totalPts:7,  ppg:7.0, alive:1},
+// VANDERWEL
+{player:"Victor Wembanyama",        pick:7,   owner:"Vanderwel", nbaTeam:"SAN", games:1,totalPts:35, ppg:35.0,alive:1},
+{player:"Jalen Brunson",            pick:16,  owner:"Vanderwel", nbaTeam:"NYK", games:1,totalPts:28, ppg:28.0,alive:1},
+{player:"Stephon Castle",           pick:27,  owner:"Vanderwel", nbaTeam:"SAN", games:1,totalPts:17, ppg:17.0,alive:1},
+{player:"Alperen Sengun",           pick:38,  owner:"Vanderwel", nbaTeam:"HOU", games:1,totalPts:19, ppg:19.0,alive:1},
+{player:"Isaiah Hartenstein",       pick:49,  owner:"Vanderwel", nbaTeam:"OKC", games:1,totalPts:8,  ppg:8.0, alive:1},
+{player:"Luguentz Dort",            pick:60,  owner:"Vanderwel", nbaTeam:"OKC", games:1,totalPts:8,  ppg:8.0, alive:1},
+{player:"Jalen Johnson",            pick:71,  owner:"Vanderwel", nbaTeam:"ATL", games:1,totalPts:23, ppg:23.0,alive:1},
+{player:"Deni Avdija",              pick:82,  owner:"Vanderwel", nbaTeam:"POR", games:1,totalPts:30, ppg:30.0,alive:1},
+{player:"Onyeka Okongwu",           pick:93,  owner:"Vanderwel", nbaTeam:"ATL", games:1,totalPts:19, ppg:19.0,alive:1},
+{player:"Donte DiVincenzo",         pick:104, owner:"Vanderwel", nbaTeam:"NYK", games:1,totalPts:12, ppg:12.0,alive:1},
+];
+
+// ── COMPUTE RANKS ─────────────────────────────────────────────────────────────
+function computeRanks() {
+  [...PLAYERS].sort((a,b)=>b.totalPts-a.totalPts).forEach((p,i)=>{p.rank=i+1;p.delta=p.pick-p.rank;});
+}
+computeRanks();
+
+// ── STATE ─────────────────────────────────────────────────────────────────────
+let bCol='totalPts',bDir=-1;
+let oCol='totalPts',oDir=-1;
+let vCol='totalPts',vDir=-1;
+let lbSelOwner=null;
+let curTab='lb';
+
+// ── INIT ──────────────────────────────────────────────────────────────────────
+window.onload = () => {
+  const k=localStorage.getItem('ak');
+  if(k) document.getElementById('apiKey').value=k;
+  populateFilters();
+  computeRanks();
+  renderAll();
+};
+function saveKey(){const k=document.getElementById('apiKey').value.trim();if(k)localStorage.setItem('ak',k);}
+
+// ── HELPERS ──────────────────────────────────────────────────────────────────
+const OWNERS = [...new Set(PLAYERS.map(p=>p.owner))].sort();
+const NBA_TEAMS = [...new Set(PLAYERS.map(p=>p.nbaTeam))].sort();
+
+function ownerTots() {
+  const t={};
+  PLAYERS.forEach(p=>{
+    if(!t[p.owner]) t[p.owner]={pts:0,alive:0,total:0};
+    t[p.owner].pts+=p.totalPts;
+    if(p.alive) t[p.owner].alive++;
+    t[p.owner].total++;
+  });
+  return t;
+}
+
+function populateFilters() {
+  const fO=document.getElementById('fOwner');
+  const oS=document.getElementById('ownerSel');
+  OWNERS.forEach(o=>{
+    const op1=document.createElement('option');op1.value=o;op1.textContent=o;fO.appendChild(op1);
+    const op2=document.createElement('option');op2.value=o;op2.textContent=o;oS.appendChild(op2);
+  });
+}
+
+function setStatus(t,m){document.getElementById('sdot').className='sdot '+t;document.getElementById('stxt').textContent=m;}
+
+function renderAll(){
+  if(curTab==='lb') renderLB();
+  else if(curTab==='board') renderBoard();
+  else if(curTab==='view') renderOwnerView();
+}
+
+// ── TABS ──────────────────────────────────────────────────────────────────────
+function showTab(t){
+  curTab=t;
+  ['lb','board','view'].forEach(id=>{document.getElementById('tab-'+id).style.display=id===t?'':'none';});
+  document.querySelectorAll('.tab').forEach((b,i)=>{b.classList.toggle('active',['lb','board','view'][i]===t);});
+  renderAll();
+}
+
+// ── API REFRESH ───────────────────────────────────────────────────────────────
+async function fetchLive() {
+  const key=document.getElementById('apiKey').value.trim();
+  if(!key){setStatus('err','Enter an Anthropic API key above to refresh stats.');return;}
+  document.getElementById('overlay').classList.add('on');
+  document.getElementById('overlay-txt').textContent='Fetching live 2026 NBA playoff stats for all 110 players…';
+  document.getElementById('spin').classList.add('on');
+  document.getElementById('refBtn').disabled=true;
+  document.getElementById('refLbl').textContent='Loading…';
+  setStatus('loading','Querying live data…');
+
+  const list=PLAYERS.map(p=>`${p.player} (${p.nbaTeam})`).join(', ');
+  const prompt=`You are a sports data assistant with web search. Fetch the CUMULATIVE 2026 NBA Playoffs stats for every player listed below and return ONLY a JSON array. No prose, no markdown, no code fences.
+
+Players: ${list}
+
+For each player, return their cumulative 2026 playoff totals:
+- player: exact name as given
+- games: total playoff games played (integer)
+- totalPts: total points scored across all games (integer)
+- ppg: points per game, 1 decimal place
+- alive: 1 if team still in 2026 playoffs, 0 if eliminated
+
+Return ONLY the JSON array, nothing else:
+[{"player":"Name","games":2,"totalPts":50,"ppg":25.0,"alive":1}, ...]`;
+
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-calls':'true'},
+      body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:4000,tools:[{type:'web_search_20250305',name:'web_search'}],messages:[{role:'user',content:prompt}]})
+    });
+    if(!res.ok){const e=await res.json().catch(()=>({}));throw new Error(e.error?.message||`HTTP ${res.status}`);}
+    const data=await res.json();
+    const txt=(data.content||[]).filter(b=>b.type==='text').map(b=>b.text).join('');
+    const match=txt.replace(/```json|```/g,'').trim().match(/\[[\s\S]*\]/);
+    if(!match) throw new Error('Could not find JSON in response.');
+    const stats=JSON.parse(match[0]);
+    let n=0;
+    stats.forEach(s=>{
+      const row=PLAYERS.find(r=>r.player.toLowerCase()===s.player.toLowerCase());
+      if(row){row.games=Math.round(s.games||0);row.totalPts=Math.round(s.totalPts||0);row.ppg=parseFloat((s.ppg||0).toFixed(1));row.alive=(s.alive===1||s.alive===true)?1:0;n++;}
+    });
+    computeRanks();renderAll();
+    const t=new Date().toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
+    setStatus('ok',`Updated ${t} — ${n}/110 players refreshed.`);
+  } catch(e){setStatus('err','Error: '+e.message);}
+  finally{
+    document.getElementById('overlay').classList.remove('on');
+    document.getElementById('spin').classList.remove('on');
+    document.getElementById('refBtn').disabled=false;
+    document.getElementById('refLbl').textContent='↺ Refresh live stats';
+  }
+}
+
+// ── RENDER: STANDINGS / LEADERBOARD ──────────────────────────────────────────
+function renderLB() {
+  const tots=ownerTots();
+  const ranked=Object.entries(tots).sort((a,b)=>b[1].pts-a[1].pts);
+  const maxPts=ranked[0]?.[1].pts||1;
+  const totalLeaguePts=PLAYERS.reduce((s,p)=>s+p.totalPts,0);
+  const aliveCount=PLAYERS.filter(p=>p.alive).length;
+  const topPlayer=[...PLAYERS].sort((a,b)=>b.totalPts-a.totalPts)[0];
+
+  document.getElementById('lb-stats').innerHTML=`
+    <div class="sc"><div class="sc-lbl">League total</div><div class="sc-val">${totalLeaguePts.toLocaleString()}</div><div class="sc-sub">points scored</div></div>
+    <div class="sc"><div class="sc-lbl">Leader</div><div class="sc-val" style="font-size:14px;padding-top:3px">${ranked[0]?.[0]||'—'}</div><div class="sc-sub">${ranked[0]?.[1].pts||0} pts</div></div>
+    <div class="sc"><div class="sc-lbl">2nd place</div><div class="sc-val" style="font-size:14px;padding-top:3px">${ranked[1]?.[0]||'—'}</div><div class="sc-sub">${ranked[1]?.[1].pts||0} pts</div></div>
+    <div class="sc"><div class="sc-lbl">Top player</div><div class="sc-val" style="font-size:12px;padding-top:5px">${topPlayer?.player.split(' ').pop()||'—'}</div><div class="sc-sub">${topPlayer?.totalPts||0} pts · ${topPlayer?.owner||''}</div></div>
+    <div class="sc"><div class="sc-lbl">Players alive</div><div class="sc-val">${aliveCount}</div><div class="sc-sub">of 110</div></div>
+  `;
+
+  document.getElementById('lb-grid').innerHTML=ranked.map(([owner,d],i)=>{
+    const pct=Math.round(d.pts/maxPts*100);
+    const cc=OC[owner]||'#333';
+    const medal=i===0?'🥇 ':i===1?'🥈 ':i===2?'🥉 ':'';
+    const sel=owner===lbSelOwner;
+    return `<div class="lb-card lb-${i+1}${sel?' selected':''}" onclick="toggleLBRoster('${owner}')">
+      <div class="lb-rank-lbl">#${i+1} ${i<3?medal:''}</div>
+      <div class="lb-name" style="color:${cc}">${owner}</div>
+      <div class="lb-pts-big" style="color:${cc}">${d.pts.toLocaleString()}</div>
+      <div class="lb-sub">${d.alive}/10 alive · click to view roster</div>
+      <div class="lb-prog"><div class="lb-prog-fill" style="width:${pct}%;background:${cc}"></div></div>
+    </div>`;
+  }).join('');
+
+  if(lbSelOwner) renderLBRoster(lbSelOwner);
+}
+
+function toggleLBRoster(owner) {
+  if(lbSelOwner===owner){lbSelOwner=null;document.getElementById('lb-roster-section').style.display='none';}
+  else{lbSelOwner=owner;renderLBRoster(owner);}
+  renderLB();
+}
+function closeLBRoster(){lbSelOwner=null;document.getElementById('lb-roster-section').style.display='none';renderLB();}
+
+function renderLBRoster(owner) {
+  const cc=OC[owner]||'#333';
+  document.getElementById('lb-owner-title').innerHTML=`<span style="color:${cc}">${owner}</span> — Roster`;
+  const rows=PLAYERS.filter(p=>p.owner===owner).sort((a,b)=>oDir*(typeof a[oCol]==='string'?a[oCol].localeCompare(b[oCol]):a[oCol]-b[oCol]));
+  const maxP=Math.max(...rows.map(r=>r.totalPts),1);
+  updateArrows('oth',oCol,oDir,['rank','player','pick','nbaTeam','games','totalPts','ppg','alive','delta']);
+  document.getElementById('oth-tbody').innerHTML=rows.map(p=>pRow(p,maxP)).join('');
+  document.getElementById('lb-roster-section').style.display='';
+  setTimeout(()=>document.getElementById('lb-roster-section').scrollIntoView({behavior:'smooth',block:'nearest'}),50);
+}
+function sortO(col){if(oCol===col)oDir*=-1;else{oCol=col;oDir=(col==='rank'||col==='pick')?1:-1;}if(lbSelOwner)renderLBRoster(lbSelOwner);}
+
+// ── RENDER: PLAYER BOARD ─────────────────────────────────────────────────────
+function renderBoard() {
+  const srch=document.getElementById('search').value.toLowerCase();
+  const of=document.getElementById('fOwner').value;
+  const tf=document.getElementById('fTeam').value;
+  const af=document.getElementById('fAlive').value;
+  let rows=PLAYERS.filter(p=>{
+    if(srch&&!p.player.toLowerCase().includes(srch)&&!p.nbaTeam.toLowerCase().includes(srch)&&!p.owner.toLowerCase().includes(srch))return false;
+    if(of&&p.owner!==of)return false;
+    if(tf&&p.nbaTeam!==tf)return false;
+    if(af==='1'&&!p.alive)return false;
+    if(af==='0'&&p.alive)return false;
+    return true;
+  });
+  rows.sort((a,b)=>bDir*(typeof a[bCol]==='string'?a[bCol].localeCompare(b[bCol]):a[bCol]-b[bCol]));
+  updateArrows('bth',bCol,bDir,['rank','player','pick','owner','nbaTeam','games','totalPts','ppg','alive','delta']);
+  const maxP=Math.max(...rows.map(r=>r.totalPts),1);
+  document.getElementById('bth-tbody').innerHTML=rows.map(p=>pRowBoard(p,maxP)).join('');
+}
+function sortB(col){if(bCol===col)bDir*=-1;else{bCol=col;bDir=(col==='rank'||col==='pick')?1:-1;}document.getElementById('sortSel').value=bCol+(bDir===1?'-a':'-d');renderBoard();}
+function setBoardSort(){const[c,d]=document.getElementById('sortSel').value.split('-');bCol=c;bDir=d==='a'?1:-1;renderBoard();}
+
+// ── RENDER: OWNER VIEW ────────────────────────────────────────────────────────
+function renderOwnerView() {
+  const owner=document.getElementById('ownerSel').value;
+  const content=document.getElementById('owner-view-content');
+  const empty=document.getElementById('owner-view-empty');
+  if(!owner){content.style.display='none';empty.style.display='';return;}
+  content.style.display='';empty.style.display='none';
+  const cc=OC[owner]||'#333';
+  const rows=PLAYERS.filter(p=>p.owner===owner);
+  const sorted=[...rows].sort((a,b)=>vDir*(typeof a[vCol]==='string'?a[vCol].localeCompare(b[vCol]):a[vCol]-b[vCol]));
+  const tot=rows.reduce((s,p)=>s+p.totalPts,0);
+  const alive=rows.filter(p=>p.alive).length;
+  const top=[...rows].sort((a,b)=>b.totalPts-a.totalPts)[0];
+  const tots=ownerTots();
+  const ranked=Object.entries(tots).sort((a,b)=>b[1].pts-a[1].pts);
+  const myRank=ranked.findIndex(([o])=>o===owner)+1;
+
+  document.getElementById('ov-stats').innerHTML=`
+    <div class="sc"><div class="sc-lbl">Total points</div><div class="sc-val" style="color:${cc}">${tot.toLocaleString()}</div><div class="sc-sub">after G1</div></div>
+    <div class="sc"><div class="sc-lbl">League rank</div><div class="sc-val">${myRank} of ${ranked.length}</div><div class="sc-sub">standings</div></div>
+    <div class="sc"><div class="sc-lbl">Players alive</div><div class="sc-val">${alive}</div><div class="sc-sub">of 10</div></div>
+    <div class="sc"><div class="sc-lbl">Top player</div><div class="sc-val" style="font-size:12px;padding-top:5px">${top?.player.split(' ').pop()||'—'}</div><div class="sc-sub">${top?.totalPts||0} pts</div></div>
+    <div class="sc"><div class="sc-lbl">Gap to leader</div><div class="sc-val" style="font-size:15px;padding-top:4px">${myRank===1?'—':'-'+(ranked[0][1].pts-tot)}</div><div class="sc-sub">vs ${ranked[0][0]}</div></div>
+  `;
+
+  updateArrows('vth',vCol,vDir,['rank','player','pick','nbaTeam','games','totalPts','ppg','alive','delta']);
+  const maxP=Math.max(...rows.map(r=>r.totalPts),1);
+  document.getElementById('vth-tbody').innerHTML=sorted.map(p=>pRowOwner(p,maxP,cc)).join('');
+}
+function sortV(col){if(vCol===col)vDir*=-1;else{vCol=col;vDir=(col==='rank'||col==='pick')?1:-1;}renderOwnerView();}
+
+// ── ROW RENDERERS ─────────────────────────────────────────────────────────────
+function pRow(p,maxP) {
+  const cc=OC[p.owner]||'#333';
+  const{rc,dc,ds,ab,pp,ppgS,bp}=rowVars(p,maxP,cc);
+  return `<tr class="${p.warn?'warn-row':''}">
+    <td class="${rc}">${p.rank}</td>
+    <td><span class="pname">${p.player}</span></td>
+    <td class="mono">${p.pick}</td>
+    <td><span class="tbadge">${p.nbaTeam}</span></td>
+    <td class="mono">${p.games}</td>
+    <td><div class="bw"><span class="pts-strong">${pp}</span><div class="bar"><div class="bf" style="width:${bp}%;background:${cc}"></div></div></div></td>
+    <td class="mono">${ppgS}</td>
+    <td>${ab}</td>
+    <td class="${dc}">${ds}</td>
+  </tr>`;
+}
+function pRowBoard(p,maxP) {
+  const cc=OC[p.owner]||'#333';
+  const{rc,dc,ds,ab,pp,ppgS,bp}=rowVars(p,maxP,cc);
+  return `<tr class="${p.warn?'warn-row':''}">
+    <td class="${rc}">${p.rank}</td>
+    <td><span class="pname">${p.player}</span></td>
+    <td class="mono">${p.pick}</td>
+    <td><span class="obadge" style="background:${cc}18;color:${cc};border:1px solid ${cc}35">${p.owner}</span></td>
+    <td><span class="tbadge">${p.nbaTeam}</span></td>
+    <td class="mono">${p.games}</td>
+    <td><div class="bw"><span class="pts-strong">${pp}</span><div class="bar"><div class="bf" style="width:${bp}%;background:${cc}"></div></div></div></td>
+    <td class="mono">${ppgS}</td>
+    <td>${ab}</td>
+    <td class="${dc}">${ds}</td>
+  </tr>`;
+}
+function pRowOwner(p,maxP,cc) {
+  const{rc,dc,ds,ab,pp,ppgS,bp}=rowVars(p,maxP,cc);
+  return `<tr class="${p.warn?'warn-row':''}">
+    <td class="${rc}">${p.rank}</td>
+    <td><span class="pname">${p.player}</span></td>
+    <td class="mono">${p.pick}</td>
+    <td><span class="tbadge">${p.nbaTeam}</span></td>
+    <td class="mono">${p.games}</td>
+    <td><div class="bw"><span class="pts-strong">${pp}</span><div class="bar"><div class="bf" style="width:${bp}%;background:${cc}"></div></div></div></td>
+    <td class="mono">${ppgS}</td>
+    <td>${ab}</td>
+    <td class="${dc}">${ds}</td>
+  </tr>`;
+}
+function rowVars(p,maxP,cc) {
+  return {
+    rc: p.rank===1?'r1':p.rank<=3?'rtop':'',
+    dc: p.delta>0?'dpos':p.delta<0?'dneg':'d0',
+    ds: p.delta===0?'—':p.delta>0?'+'+p.delta:String(p.delta),
+    ab: p.alive?'<span class="abadge a1">Alive</span>':'<span class="abadge a0">Out</span>',
+    pp: p.totalPts>0?p.totalPts:'—',
+    ppgS: p.ppg>0?p.ppg.toFixed(1):'—',
+    bp: p.totalPts>0?Math.min(100,Math.round(p.totalPts/maxP*100)):0,
+  };
+}
+function updateArrows(prefix,col,dir,cols) {
+  cols.forEach(c=>{
+    const el=document.getElementById(prefix+'-'+c);if(!el)return;
+    const base=el.textContent.replace(/ [↑↓]$/,'');
+    el.textContent=base+(col===c?(dir===1?' ↑':' ↓'):'');
+    el.classList.toggle('as',col===c);
+  });
+}
+</script>
+</body>
+</html>
